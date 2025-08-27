@@ -25,8 +25,6 @@ function redirectToProfileFriendsPage(profileUrl) {
   if (window.location.href !== profileUrl + '/friends') {
     window.location = profileUrl + '/friends';
   }
-
-  startAutoScrollForOpenAllPaginatedFriends(collectAllFriendLinks);
 }
 
 function startAutoScrollForOpenAllPaginatedFriends(done) {
@@ -74,14 +72,9 @@ async function saveData({ profileUrl, friendUrls }) {
     method: 'POST',
   });
 
-  const data = await response.json();
-
-  return data;
+  await response.json();
 }
 
 async function start() {
   const friendUrls = await methods.getFriends();
-
-  console.log('friendUrls --> ', friendUrls);
 }
-start();
