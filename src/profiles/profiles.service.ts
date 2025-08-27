@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { CreateProfileDto } from './dto/create-profile.dto';
 import { Profile } from './entities/profile.entity';
 
@@ -11,42 +11,62 @@ export class ProfilesService {
     private profilesRepository: Repository<Profile>,
   ) {}
 
+  async getFriendsByUrl(url: string): Promise<string[]> {
+    const profile = await this.profilesRepository.findOne({
+      where: { url },
+      relations: ['friends'], // This is crucial to load the friends
+    });
+
+    if (!profile) {
+      // Throws a 404 Not Found error if the profile URL doesn't exist
+      throw new NotFoundException(`Profile with URL ${url} not found`);
+    }
+
+    // Use .map() to return just the URL of each friend
+    return profile.friends.map((friend) => friend.url);
+  }
+
   async addProfileAndFriends(
     createProfileDto: CreateProfileDto,
   ): Promise<Profile | null> {
     const { profileUrl, friendUrls } = createProfileDto;
 
-    // "Find or Create" the main profile
     const mainProfile = await this.findOrCreateProfileByUrl(profileUrl);
-
-    // "Find or Create" all friend profiles
+    const uniqueFriendUrls = [...new Set(friendUrls)];
     const friendProfiles = await Promise.all(
-      friendUrls.map((url) => this.findOrCreateProfileByUrl(url)),
+      uniqueFriendUrls.map((url) => this.findOrCreateProfileByUrl(url)),
     );
 
-    // Load existing friends to avoid removing them
-    const mainProfileWithFriends = await this.profilesRepository.findOne({
+    const existingRelations = await this.profilesRepository.findOne({
       where: { id: mainProfile.id },
       relations: ['friends'],
     });
 
-    if (!mainProfileWithFriends) {
-      // This case is unlikely if findOrCreateProfileByUrl works, but it's good practice
-      return null;
+    if (!existingRelations) {
+      throw new Error('Could not find the main profile after creating it.');
     }
 
-    // Add the new friends to the existing friends list
     const existingFriendIds = new Set(
-      mainProfileWithFriends.friends.map((f) => f.id),
+      existingRelations.friends.map((f) => f.id),
     );
-    for (const friend of friendProfiles) {
-      if (!existingFriendIds.has(friend.id) && mainProfile.id !== friend.id) {
-        mainProfileWithFriends.friends.push(friend);
-      }
+
+    const newFriendRelations = friendProfiles.filter(
+      (friend) =>
+        !existingFriendIds.has(friend.id) && friend.id !== mainProfile.id,
+    );
+
+    if (newFriendRelations.length > 0) {
+      await this.profilesRepository
+        .createQueryBuilder()
+        .relation(Profile, 'friends')
+        .of(mainProfile)
+        .add(newFriendRelations.map((friend) => friend.id));
     }
 
-    // Save the main profile with its updated friends list
-    return this.profilesRepository.save(mainProfileWithFriends);
+    return this.profilesRepository.findOne({
+      where: { id: mainProfile.id },
+      relations: ['friends'],
+    });
   }
 
   private async findOrCreateProfileByUrl(url: string): Promise<Profile> {
@@ -55,7 +75,20 @@ export class ProfilesService {
       return existingProfile;
     }
 
-    const newProfile = this.profilesRepository.create({ url });
-    return this.profilesRepository.save(newProfile);
+    try {
+      const newProfile = this.profilesRepository.create({ url });
+      return await this.profilesRepository.save(newProfile);
+    } catch (error) {
+      if (error.code === '23505') {
+        const profile = await this.profilesRepository.findOneBy({ url });
+        if (profile) {
+          return profile;
+        }
+        throw new Error(
+          `Could not find profile for url: ${url} after race condition.`,
+        );
+      }
+      throw error;
+    }
   }
 }

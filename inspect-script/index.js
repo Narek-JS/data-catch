@@ -1,5 +1,32 @@
+const methods = {
+  getFriends: async () => {
+    const url =
+      'http://localhost:3000/profiles?url=' + methods.getCurrentProfileUrl();
+
+    const response = await fetch(url);
+
+    const data = await response.json();
+
+    if (data.length) {
+      return data;
+    }
+
+    return [];
+  },
+
+  getCurrentProfileUrl: () => {
+    const currentProfileUrl = window.location.pathname.replace('/friends', '');
+
+    return currentProfileUrl;
+  },
+};
+
 function redirectToProfileFriendsPage(profileUrl) {
-  window.location = profileUrl + '/friends';
+  if (window.location.href !== profileUrl + '/friends') {
+    window.location = profileUrl + '/friends';
+  }
+
+  startAutoScrollForOpenAllPaginatedFriends(collectAllFriendLinks);
 }
 
 function startAutoScrollForOpenAllPaginatedFriends(done) {
@@ -22,7 +49,7 @@ function startAutoScrollForOpenAllPaginatedFriends(done) {
   }, 5000);
 }
 
-function collectAllFriendLinks() {
+async function collectAllFriendLinks() {
   const allFriendProfileLinkElements = document.querySelectorAll(
     'a:has(img[height="80"][width="80"])',
   );
@@ -33,23 +60,28 @@ function collectAllFriendLinks() {
     friendUrls.push(element.getAttribute('href'));
   }
 
-  // Get the main profile's URL from the current page
-  const profileUrl = window.location.href;
+  const profileUrl = methods.getCurrentProfileUrl();
 
-  saveData({ profileUrl, friendUrls });
+  await saveData({ profileUrl, friendUrls });
 }
 
-async function saveData(payload) {
+async function saveData({ profileUrl, friendUrls }) {
   const url = 'http://localhost:3000/profiles';
 
   const response = await fetch(url, {
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ profileUrl, friendUrls }),
     method: 'POST',
   });
 
   const data = await response.json();
+
   return data;
 }
 
-startAutoScrollForOpenAllPaginatedFriends(collectAllFriendLinks);
+async function start() {
+  const friendUrls = await methods.getFriends();
+
+  console.log('friendUrls --> ', friendUrls);
+}
+start();
