@@ -1,33 +1,26 @@
 const methods = {
-  getFriends: async () => {
-    const url =
-      'http://localhost:3000/profiles?url=' + methods.getCurrentProfileUrl();
-
-    const response = await fetch(url);
-
-    const data = await response.json();
-
-    if (data.length) {
-      return data;
-    }
-
-    return [];
+  redirectToProfileFriendsPage: (profileUrl) => {
+    window.location = profileUrl + '/friends';
   },
 
-  getCurrentProfileUrl: () => {
-    const currentProfileUrl = window.location.pathname.replace('/friends', '');
-
-    return currentProfileUrl;
+  storage: {
+    PROFILES_STORAGE_KEY: 'currentProfileFriends',
+    getCurrentProfileFriends: () => {
+      const currentProfileFriendsStream = localStorage.getItem(
+        methods.storage.PROFILES_STORAGE_KEY,
+      );
+      return JSON.parse(currentProfileFriendsStream || '[]');
+    },
+    setProfileFriends: (profileFriends) => {
+      localStorage.setItem(
+        methods.storage.PROFILES_STORAGE_KEY,
+        JSON.stringify(profileFriends),
+      );
+    },
   },
 };
 
-function redirectToProfileFriendsPage(profileUrl) {
-  if (window.location.href !== profileUrl + '/friends') {
-    window.location = profileUrl + '/friends';
-  }
-}
-
-function startAutoScrollForOpenAllPaginatedFriends(done) {
+function startAutoScrollForOpenAllPaginatedFriends(doneCb) {
   let lastHeight = 0;
 
   const scrollInterval = setInterval(() => {
@@ -37,44 +30,57 @@ function startAutoScrollForOpenAllPaginatedFriends(done) {
 
     if (newHeight === lastHeight) {
       clearInterval(scrollInterval);
-
-      if (done) {
-        done();
-      }
+      doneCb();
     }
 
     lastHeight = newHeight;
-  }, 5000);
+  }, 2500);
 }
 
-async function collectAllFriendLinks() {
+function collectAllFriendLinks(doneCb) {
   const allFriendProfileLinkElements = document.querySelectorAll(
     'a:has(img[height="80"][width="80"])',
   );
 
-  const friendUrls = [];
+  const links = [];
 
   for (const element of allFriendProfileLinkElements) {
-    friendUrls.push(element.getAttribute('href'));
+    links.push(element.getAttribute('href'));
   }
 
-  const profileUrl = methods.getCurrentProfileUrl();
-
-  await saveData({ profileUrl, friendUrls });
+  const currentProfileUrl = window.location.href.replace('/friends', '');
+  doneCb({ currentProfileUrl, links });
 }
 
-async function saveData({ profileUrl, friendUrls }) {
+async function saveLinks({ currentProfileUrl, links }, doneCb) {
   const url = 'http://localhost:3000/profiles';
 
-  const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ profileUrl, friendUrls }),
+  const responseStream = await fetch(url, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profileUrl: currentProfileUrl, friendUrls: links }),
   });
 
-  await response.json();
+  const response = await responseStream.json();
+  const friends = response.friends.map((friend) => friend.url);
+  doneCb({ friends });
+
+  return response;
 }
 
-async function start() {
-  const friendUrls = await methods.getFriends();
+function moveToCollectNextOneFriends(friends) {
+  const profileFriends = methods.storage.getCurrentProfileFriends();
+  const friendsProcess = profileFriends.length ? profileFriends : [...friends];
+
+  const firstProfileLink = friendsProcess.shift();
+  methods.storage.setProfileFriends(friendsProcess);
+  methods.redirectToProfileFriendsPage(firstProfileLink);
 }
+
+startAutoScrollForOpenAllPaginatedFriends(() => {
+  collectAllFriendLinks(({ currentProfileUrl, links }) => {
+    saveLinks({ currentProfileUrl, links }, ({ friends }) => {
+      moveToCollectNextOneFriends(friends);
+    });
+  });
+});
