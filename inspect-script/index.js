@@ -34,7 +34,7 @@ function startAutoScrollForOpenAllPaginatedFriends(doneCb) {
     }
 
     lastHeight = newHeight;
-  }, 2500);
+  }, 5000);
 }
 
 function collectAllFriendLinks(doneCb) {
