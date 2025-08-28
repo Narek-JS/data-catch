@@ -11,7 +11,11 @@ export class ProfilesService {
     private profilesRepository: Repository<Profile>,
   ) {}
 
-  async getFriendsByUrl(url: string): Promise<string[]> {
+  findAll(): Promise<Profile[]> {
+    return this.profilesRepository.find();
+  }
+
+  async getFriendsByUrl(url: string): Promise<Profile[]> {
     const profile = await this.profilesRepository.findOne({
       where: { url },
       relations: ['friends'], // This is crucial to load the friends
@@ -23,7 +27,7 @@ export class ProfilesService {
     }
 
     // Use .map() to return just the URL of each friend
-    return profile.friends.map((friend) => friend.url);
+    return profile.friends;
   }
 
   async addProfileAndFriends(

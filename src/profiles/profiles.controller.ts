@@ -6,6 +6,11 @@ import { CreateProfileDto } from './dto/create-profile.dto';
 export class ProfilesController {
   constructor(private readonly profilesService: ProfilesService) {}
 
+  @Get()
+  findAll() {
+    return this.profilesService.findAll();
+  }
+
   @Get('friends')
   getFriendsByUrl(@Query('url') profileUrl: string) {
     return this.profilesService.getFriendsByUrl(profileUrl);
