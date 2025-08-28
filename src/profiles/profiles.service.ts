@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { CreateProfileDto } from './dto/create-profile.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Profile } from './entities/profile.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, Repository } from 'typeorm';
 
 @Injectable()
 export class ProfilesService {
@@ -71,6 +72,23 @@ export class ProfilesService {
       where: { id: mainProfile.id },
       relations: ['friends'],
     });
+  }
+
+  async findProfilesToUpdate(limit: number = 10): Promise<Profile[]> {
+    return this.profilesRepository.find({
+      where: { name: IsNull() },
+      take: limit,
+    });
+  }
+
+  async updateName(updateProfileDto: UpdateProfileDto): Promise<void> {
+    const { url, name } = updateProfileDto;
+
+    const result = await this.profilesRepository.update({ url }, { name });
+
+    if (result.affected === 0) {
+      throw new NotFoundException(`Profile with URL ${url} not found`);
+    }
   }
 
   private async findOrCreateProfileByUrl(url: string): Promise<Profile> {
