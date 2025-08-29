@@ -3,6 +3,46 @@ const methods = {
     window.location = profileUrl + '/friends';
   },
 
+  findAllFriendProfileLinkElements: () => {
+    const getThatPoint = () => {
+      const currentPageURL = window.location.href;
+      const allLinks = document.querySelectorAll('a');
+
+      const friendsLinks = Array.from(allLinks).filter(
+        (link) =>
+          link.textContent.trim() === 'Друзья' && link.href === currentPageURL,
+      );
+
+      return friendsLinks[1];
+    };
+
+    const targetLink = getThatPoint();
+    const searchInput = document.querySelector('input[placeholder="Поиск"]');
+
+    let finalContainerDiv = null;
+
+    if (targetLink && searchInput) {
+      let lowestCommonAncestor = null;
+      let parent = targetLink.parentElement;
+
+      while (parent) {
+        if (parent.contains(searchInput)) {
+          lowestCommonAncestor = parent;
+          break;
+        }
+        parent = parent.parentElement;
+      }
+
+      if (lowestCommonAncestor) {
+        finalContainerDiv = lowestCommonAncestor.parentElement;
+      }
+    }
+
+    return finalContainerDiv.querySelectorAll(
+      'a:has(img[height="80"][width="80"])',
+    );
+  },
+
   storage: {
     PROFILES_STORAGE_KEY: 'currentProfileFriends',
     getCurrentProfileFriends: () => {
@@ -56,9 +96,8 @@ function startAutoScrollForOpenAllPaginatedFriends(doneCb) {
 }
 
 function collectAllFriendLinks(doneCb) {
-  const allFriendProfileLinkElements = document.querySelectorAll(
-    'a:has(img[height="80"][width="80"])',
-  );
+  const allFriendProfileLinkElements =
+    methods.findAllFriendProfileLinkElements();
 
   const links = [];
 
