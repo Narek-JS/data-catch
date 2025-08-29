@@ -21,20 +21,38 @@ const methods = {
 };
 
 function startAutoScrollForOpenAllPaginatedFriends(doneCb) {
+  const MINUTE = 4.5;
+  const TIMEOUT_DURATION = MINUTE * 60 * 1000;
+
   let lastHeight = 0;
+  let isDone = false;
+  let scrollInterval;
+  let timeoutId;
 
-  const scrollInterval = setInterval(() => {
+  const finish = () => {
+    if (isDone) return;
+
+    isDone = true;
+
+    clearInterval(scrollInterval);
+    clearTimeout(timeoutId);
+    doneCb();
+  };
+
+  scrollInterval = setInterval(() => {
     window.scrollTo(0, document.body.scrollHeight);
-
     const newHeight = document.body.scrollHeight;
 
     if (newHeight === lastHeight) {
-      clearInterval(scrollInterval);
-      doneCb();
+      finish();
     }
 
     lastHeight = newHeight;
   }, 5000);
+
+  timeoutId = setTimeout(() => {
+    finish();
+  }, TIMEOUT_DURATION);
 }
 
 function collectAllFriendLinks(doneCb) {
